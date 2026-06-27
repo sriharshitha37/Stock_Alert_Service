@@ -1,3 +1,4 @@
+from fastapi.responses import HTMLResponse
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -162,4 +163,7 @@ def get_rsi(symbol: str):
         "signal": signal,
         "rsi_history": [{"date": d, "rsi": r} for d, r in zip(rsi_dates, rsi_values)]
     }
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+@app.get("/ui", response_class=HTMLResponse)
+async def serve_ui():
+    with open("static/index.html") as f:
+        return f.read()
