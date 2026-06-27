@@ -11,6 +11,9 @@
 ---
 
 ## 🚀 Live Demo
+🌐 **LIVE LINK : [https://stock-alert-service.onrender.com/ui](https://stock-alert-service.onrender.com/ui)**
+
+📖 **API Docs : [https://stock-alert-service.onrender.com/docs](https://stock-alert-service.onrender.com/docs)**
 
 > <img width="1291" height="771" alt="image" src="https://github.com/user-attachments/assets/f4e1669e-2403-4179-958c-97500906f42c" />
 > <img width="1036" height="546" alt="image" src="https://github.com/user-attachments/assets/1e4480a2-f7f1-4126-8c68-716f644d5473" />
@@ -110,32 +113,6 @@ Alert state (triggered/not triggered) is persisted in SQLite via SQLAlchemy ORM.
   "rsi_history": [...]
 }
 ```
-
----
-
-## 🏃 Running Locally
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/stock-alert-service.git
-cd stock-alert-service
-
-# 2. Create virtual environment
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Mac/Linux
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Start the server
-uvicorn main:app --reload
-
-# 5. Open in browser
-# Dashboard → http://127.0.0.1:8000/index.html
-# API Docs  → http://127.0.0.1:8000/docs
-```
-
 ---
 
 ## 🔮 Future Scope
