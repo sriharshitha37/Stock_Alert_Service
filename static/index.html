@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stock Alert Service</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; min-height: 100vh; padding: 40px 20px; }
+    .container { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 1.6rem; color: #00d09c; margin-bottom: 4px; }
+    .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 32px; }
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 0.85rem; color: #aaa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    input, select { background: #111; border: 1px solid #333; color: #e0e0e0; padding: 10px 14px; border-radius: 8px; font-size: 0.95rem; outline: none; flex: 1; min-width: 100px; }
+    input:focus, select:focus { border-color: #00d09c; }
+    button { background: #00d09c; color: #000; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95rem; white-space: nowrap; }
+    button:hover { background: #00b386; }
+    .price-display { margin-top: 16px; font-size: 2.2rem; font-weight: 700; color: #00d09c; }
+    .price-meta { font-size: 0.78rem; color: #555; margin-top: 4px; }
+    .stats-row { display: flex; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+    .stat-box { background: #111; border: 1px solid #2a2a2a; border-radius: 8px; padding: 12px 16px; flex: 1; min-width: 100px; }
+    .stat-label { font-size: 0.72rem; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+    .stat-value { font-size: 1.1rem; font-weight: 600; color: #fff; }
+    .stat-value.positive { color: #00d09c; }
+    .stat-value.negative { color: #e05555; }
+    .chart-wrap { margin-top: 20px; position: relative; height: 180px; }
+    .alert-item { background: #111; border: 1px solid #2a2a2a; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .alert-info { font-size: 0.9rem; color: #ccc; }
+    .alert-info span { color: #fff; font-weight: 600; }
+    .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .badge.triggered { background: #1a3a2a; color: #00d09c; border: 1px solid #00d09c44; }
+    .badge.watching { background: #2a2a1a; color: #f0a500; border: 1px solid #f0a50044; }
+    .empty { color: #555; font-size: 0.9rem; text-align: center; padding: 20px 0; }
+    .outline-btn { background: #1a1a1a; color: #00d09c; border: 1px solid #00d09c; margin-bottom: 16px; }
+    .outline-btn:hover { background: #0a2a1a; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a1a; border: 1px solid #00d09c; color: #00d09c; padding: 12px 20px; border-radius: 8px; font-size: 0.85rem; display: none; z-index: 999; }
+    .loader { color: #555; font-size: 0.85rem; margin-top: 12px; }
+    .rsi-badge { display: inline-block; margin-top: 12px; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; }
+    .rsi-overbought { background: #3a1a1a; color: #e05555; border: 1px solid #e0555544; }
+    .rsi-oversold { background: #1a3a2a; color: #00d09c; border: 1px solid #00d09c44; }
+    .rsi-neutral { background: #2a2a1a; color: #f0a500; border: 1px solid #f0a50044; }
+    .rsi-number { font-size: 2.2rem; font-weight: 700; margin-top: 12px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>📈 Stock Alert Service</h1>
+  <p class="subtitle">Real-time price monitoring · Built with FastAPI + SQLite</p>
+
+  <!-- Live Price + Chart -->
+  <div class="card">
+    <h2>Live Price Lookup</h2>
+    <div class="row">
+      <input id="symbolInput" type="text" placeholder="Enter symbol e.g. AAPL, TSLA, RELIANCE.NS"/>
+      <button onclick="fetchPrice()">Get Price</button>
+    </div>
+    <div id="priceResult"></div>
+  </div>
+<!-- RSI Card -->
+<div class="card">
+  <h2>RSI Indicator <span style="color:#555;font-size:0.75rem;text-transform:none;letter-spacing:0">(14-day Relative Strength Index)</span></h2>
+  <div class="row">
+    <input id="rsiSymbol" type="text" placeholder="Enter symbol e.g. AAPL, TSLA"/>
+    <button onclick="fetchRSI()">Analyse RSI</button>
+  </div>
+  <div id="rsiResult"></div>
+</div>
+  <!-- Set Alert -->
+  <div class="card">
+    <h2>Set Price Alert</h2>
+    <div class="row">
+      <input id="alertSymbol" type="text" placeholder="Symbol e.g. AAPL"/>
+      <input id="alertPrice" type="number" placeholder="Target price"/>
+      <select id="alertCondition">
+        <option value="above">Above</option>
+        <option value="below">Below</option>
+      </select>
+      <button onclick="createAlert()">Set Alert</button>
+    </div>
+  </div>
+
+  <!-- Active Alerts -->
+  <div class="card">
+    <h2>Active Alerts</h2>
+    <button class="outline-btn" onclick="checkAlerts()">🔄 Check & Refresh</button>
+    <div id="alertList"><p class="empty">Click "Check & Refresh" to load alerts</p></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const BASE = "http://127.0.0.1:8000";
+  let chartInstance = null;
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.display = "block";
+    setTimeout(() => t.style.display = "none", 3000);
+  }
+
+  async function fetchPrice() {
+    const symbol = document.getElementById("symbolInput").value.trim().toUpperCase();
+    if (!symbol) return showToast("Enter a stock symbol first");
+
+    document.getElementById("priceResult").innerHTML = `<p class="loader">Fetching live data...</p>`;
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+    try {
+      const [priceRes, histRes] = await Promise.all([
+        fetch(`${BASE}/price/${symbol}`),
+        fetch(`${BASE}/history/${symbol}`)
+      ]);
+      const price = await priceRes.json();
+      const hist = await histRes.json();
+
+      if (price.detail) {
+        document.getElementById("priceResult").innerHTML =
+          `<p style="color:#e05555;margin-top:12px">❌ ${price.detail}</p>`;
+        return;
+      }
+
+      const changeClass = hist.change_pct >= 0 ? "positive" : "negative";
+      const changeSign = hist.change_pct >= 0 ? "+" : "";
+
+      document.getElementById("priceResult").innerHTML = `
+        <div class="price-display">$${price.current_price}</div>
+        <div class="price-meta">${price.symbol} · ${price.fetched_at}</div>
+        <div class="stats-row">
+          <div class="stat-box">
+            <div class="stat-label">5D High</div>
+            <div class="stat-value positive">$${hist.high}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">5D Low</div>
+            <div class="stat-value negative">$${hist.low}</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">5D Change</div>
+            <div class="stat-value ${changeClass}">${changeSign}${hist.change_pct}%</div>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+      `;
+
+      const labels = hist.history.map(h => h.time);
+      const prices = hist.history.map(h => h.price);
+
+      const ctx = document.getElementById("priceChart").getContext("2d");
+      chartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: symbol,
+            data: prices,
+            borderColor: "#00d09c",
+            backgroundColor: "rgba(0,208,156,0.08)",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { display: false },
+            y: {
+              ticks: { color: "#555", font: { size: 11 } },
+              grid: { color: "#1e1e1e" }
+            }
+          }
+        }
+      });
+
+    } catch (e) {
+      document.getElementById("priceResult").innerHTML =
+        `<p style="color:#e05555;margin-top:12px">❌ Could not connect to server</p>`;
+    }
+  }
+
+  async function createAlert() {
+    const symbol = document.getElementById("alertSymbol").value.trim().toUpperCase();
+    const price = parseFloat(document.getElementById("alertPrice").value);
+    const condition = document.getElementById("alertCondition").value;
+    if (!symbol || isNaN(price)) return showToast("Fill in symbol and target price");
+    try {
+      await fetch(`${BASE}/alerts/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stock_symbol: symbol, target_price: price, condition })
+      });
+      showToast(`✅ Alert set for ${symbol} ${condition} $${price}`);
+      document.getElementById("alertSymbol").value = "";
+      document.getElementById("alertPrice").value = "";
+    } catch (e) {
+      showToast("❌ Could not create alert");
+    }
+  }
+
+  async function checkAlerts() {
+    document.getElementById("alertList").innerHTML = `<p class="empty">Checking live prices...</p>`;
+    try {
+      const res = await fetch(`${BASE}/alerts/check`);
+      const data = await res.json();
+      if (!data.alerts || data.alerts.length === 0) {
+        document.getElementById("alertList").innerHTML =
+          `<p class="empty">No active alerts. Set one above!</p>`;
+        return;
+      }
+      document.getElementById("alertList").innerHTML = data.alerts.map(a => `
+        <div class="alert-item">
+          <div class="alert-info">
+            <span>${a.symbol}</span> · ${a.condition} $${a.target_price} · Current: <span>$${a.current_price}</span>
+          </div>
+          <span class="badge ${a.status.includes('TRIGGERED') ? 'triggered' : 'watching'}">
+            ${a.status}
+          </span>
+        </div>
+      `).join("");
+    } catch (e) {
+      document.getElementById("alertList").innerHTML =
+        `<p class="empty" style="color:#e05555">❌ Could not reach server</p>`;
+    }
+  }
+  async function fetchRSI() {
+  const symbol = document.getElementById("rsiSymbol").value.trim().toUpperCase();
+  if (!symbol) return showToast("Enter a stock symbol first");
+
+  document.getElementById("rsiResult").innerHTML = `<p class="loader">Calculating RSI...</p>`;
+  if (window.rsiChart) { window.rsiChart.destroy(); window.rsiChart = null; }
+
+  try {
+    const res = await fetch(`${BASE}/rsi/${symbol}`);
+    const data = await res.json();
+
+    if (data.detail) {
+      document.getElementById("rsiResult").innerHTML =
+        `<p style="color:#e05555;margin-top:12px">❌ ${data.detail}</p>`;
+      return;
+    }
+
+    const rsi = data.current_rsi;
+    const badgeClass = rsi >= 70 ? "rsi-overbought" : rsi <= 30 ? "rsi-oversold" : "rsi-neutral";
+
+    document.getElementById("rsiResult").innerHTML = `
+      <div class="rsi-number" style="color:${rsi >= 70 ? '#e05555' : rsi <= 30 ? '#00d09c' : '#f0a500'}">
+        RSI: ${rsi}
+      </div>
+      <div class="rsi-badge ${badgeClass}">${data.signal}</div>
+      <div class="chart-wrap" style="margin-top:20px;height:160px">
+        <canvas id="rsiChart"></canvas>
+      </div>
+    `;
+
+    const labels = data.rsi_history.map(h => h.date);
+    const values = data.rsi_history.map(h => h.rsi);
+    const ctx = document.getElementById("rsiChart").getContext("2d");
+
+    window.rsiChart = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "RSI",
+            data: values,
+            borderColor: "#a78bfa",
+            backgroundColor: "rgba(167,139,250,0.08)",
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: "Overbought (70)",
+            data: new Array(labels.length).fill(70),
+            borderColor: "#e0555566",
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: "Oversold (30)",
+            data: new Array(labels.length).fill(30),
+            borderColor: "#00d09c66",
+            borderWidth: 1,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => `RSI: ${ctx.raw}`
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: "#555", font: { size: 10 } }, grid: { display: false } },
+          y: {
+            min: 0, max: 100,
+            ticks: { color: "#555", font: { size: 11 } },
+            grid: { color: "#1e1e1e" }
+          }
+        }
+      }
+    });
+
+  } catch (e) {
+    document.getElementById("rsiResult").innerHTML =
+      `<p style="color:#e05555;margin-top:12px">❌ Could not connect to server</p>`;
+  }
+}
+</script>
+</body>
+</html>
